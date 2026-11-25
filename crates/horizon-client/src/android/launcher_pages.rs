@@ -1563,364 +1563,101 @@ impl Launcher {
                     Action::CancelInstall,
                 );
             } else {
-                let game_home = self.catalog.config.game_home(&self.home);
-                let touch_cfg = horizon_client::touch::Settings::load_from(
-                    &game_home.join("horizon-touch.json"),
-                );
                 let card_y = 58.0 + slide_y;
                 let bottom_reserve = if self.error.is_some() || !self.catalog.status.is_empty() {
                     46.0
                 } else {
                     16.0
                 };
-                let total_avail_h = (h - card_y - bottom_reserve).clamp(210.0, 360.0);
-                let hero_h = (total_avail_h * 0.44).clamp(96.0, 126.0);
-                let bento_y = card_y + hero_h + 10.0;
-                let bento_h = (total_avail_h - hero_h - 10.0).max(108.0);
+                let card_h = (h - card_y - bottom_reserve).clamp(210.0, 360.0);
 
-                // 1. Jetpack Compose Material You Hero Banner Card (`ElevatedCard`) with integrated Split Button CTA
-                ui.m3_tonal_card(content_x, card_y, content_w, hero_h, 18.0, true);
+                // Simple Pojav-inspired home: one game card, one fixed version, one Play action.
+                ui.m3_tonal_card(content_x, card_y, content_w, card_h, 18.0, true);
+
+                let logo_size = 56.0;
+                let logo_x = content_x + (content_w - logo_size) * 0.5;
                 ui.rounded(
-                    content_x + 16.0,
-                    card_y + 14.0,
-                    46.0,
-                    46.0,
-                    14.0,
+                    logo_x,
+                    card_y + 24.0,
+                    logo_size,
+                    logo_size,
+                    16.0,
                     my3_accent_soft(),
                 );
                 ui.icon(
                     Icon::HorizonLogo,
-                    content_x + 28.0,
-                    card_y + 26.0,
-                    22.0,
+                    logo_x + 15.0,
+                    card_y + 39.0,
+                    26.0,
                     my3_accent(),
                 );
 
-                // Primary Play Split Button integrated inside the top-right of the Hero Banner Card
-                let is_launching = self.launching || self.session_worker.is_some();
-                let split_total_w = if compact {
-                    (content_w * 0.48).clamp(176.0, 240.0)
+                let title = if installed {
+                    "Minecraft Java"
                 } else {
-                    (content_w * 0.44).clamp(248.0, 316.0)
+                    "Install Minecraft Java"
                 };
-                let split_x = content_x + content_w - split_total_w - 16.0;
-                let split_y = card_y + 14.0;
-                let split_h = 44.0;
+                ui.centered_fit(
+                    Face::SemiBold,
+                    22.0,
+                    [content_x + 16.0, card_y + 92.0, content_w - 32.0, 30.0],
+                    my3_text(),
+                    title,
+                );
+                ui.centered_fit(
+                    Face::Regular,
+                    13.0,
+                    [content_x + 16.0, card_y + 124.0, content_w - 32.0, 22.0],
+                    my3_muted(),
+                    "Version 26.3 • Rust Edition",
+                );
 
+                let play_w = content_w.min(300.0).max(180.0);
+                let play_h = 48.0;
+                let play_x = content_x + (content_w - play_w) * 0.5;
+                let play_y = card_y + 164.0;
+                let is_launching = self.launching || self.session_worker.is_some();
                 if is_launching && installed {
-                    ui.rounded(split_x, split_y, split_total_w, split_h, 12.0, my3_accent_soft());
-                    ui.stroke_rounded(split_x, split_y, split_total_w, split_h, 12.0, 1.5, my3_accent());
+                    ui.rounded(play_x, play_y, play_w, play_h, 12.0, my3_accent_soft());
+                    ui.stroke_rounded(play_x, play_y, play_w, play_h, 12.0, 1.5, my3_accent());
                     ui.m3_wavy_circular_spinner(
-                        split_x + 22.0,
-                        split_y + 16.0,
+                        play_x + 24.0,
+                        play_y + 18.0,
                         7.0,
                         self.anim.shimmer_phase,
-                    );
-                    ui.m3_wavy_progress(
-                        split_x + 12.0,
-                        split_y + 32.0,
-                        (split_total_w - 24.0).max(40.0),
-                        5.5,
-                        0.68,
-                        self.anim.shimmer_phase,
-                        false,
                     );
                     ui.centered_fit(
                         Face::SemiBold,
                         14.0,
-                        [split_x + 34.0, split_y + 3.0, split_total_w - 44.0, 24.0],
+                        [play_x + 42.0, play_y + 4.0, play_w - 52.0, 38.0],
                         my3_text(),
                         "Launching...",
                     );
                 } else {
                     let play_label = if installed {
-                        "Play Minecraft 26.3"
+                        "PLAY"
                     } else if self.error.is_some() {
-                        "Retry installation"
+                        "RETRY INSTALLATION"
                     } else {
-                        "Download Minecraft 26.3"
+                        "INSTALL & PLAY"
                     };
-                    let prof_label = format!("Profile {} v", self.catalog.config.profile + 1);
-                    let (lead_r, trail_r) = ui.m3_split_button(
-                        split_x,
-                        split_y,
-                        split_total_w,
-                        split_h,
-                        Some(Icon::Play),
+                    button(
+                        &mut ui,
+                        &mut self.targets,
+                        [play_x, play_y, play_w, play_h],
                         play_label,
-                        &prof_label,
+                        Action::Play,
                         true,
                     );
-                    self.targets.push((lead_r, Action::Play));
-                    self.targets.push((trail_r, Action::Profile));
                 }
 
-                let hero_text_max = (split_x - (content_x + 74.0) - 12.0).max(110.0);
-                let hero_title = ui.fit_text(
-                    Face::SemiBold,
-                    20.5,
-                    if installed {
-                        "Ready to play"
-                    } else if compact {
-                        "Your Java worlds"
-                    } else {
-                        "Your Java worlds, on Android"
-                    },
-                    hero_text_max,
-                );
-                ui.text(
-                    Face::SemiBold,
-                    20.5,
-                    content_x + 74.0,
-                    card_y + 12.0,
-                    my3_text(),
-                    &hero_title,
-                );
-                let hero_sub = ui.fit_text(
-                    Face::Regular,
-                    12.5,
-                    &format!(
-                        "Minecraft 26.3 • Profile {} • {}",
-                        self.catalog.config.profile + 1,
-                        self.catalog.config.renderer.label()
-                    ),
-                    hero_text_max,
-                );
-                ui.text(
-                    Face::Regular,
-                    12.5,
-                    content_x + 74.0,
-                    card_y + 38.0,
-                    my3_muted(),
-                    &hero_sub,
-                );
-
-                // Interactive Active Configuration Chips (Renderer Mode, FPS Mode, Control System)
-                let chip_y = card_y + hero_h - 32.0;
-                let renderer_tag = format!("Renderer: {}", self.catalog.config.renderer.label());
-                let fps_tag = if self.catalog.config.battery_perf_mode {
-                    "FPS: 60 Hz Battery".to_owned()
-                } else if self.catalog.config.max_fps_mode {
-                    "FPS: Max Uncapped (260)".to_owned()
-                } else {
-                    "FPS: 120 Hz Balanced".to_owned()
-                };
-                let ctrl_tag = format!(
-                    "Controls: {} ({})",
-                    touch_cfg.control_style.label(),
-                    touch_cfg.preset_name
-                );
-                let mut chip_x = content_x + 16.0;
-                for (lbl, act, hi, ic) in [
-                    (renderer_tag.as_str(), Action::Renderer, true, Icon::Monitor),
-                    (
-                        fps_tag.as_str(),
-                        Action::ToggleMaxFpsMode,
-                        self.catalog.config.max_fps_mode,
-                        Icon::Play,
-                    ),
-                    (
-                        ctrl_tag.as_str(),
-                        Action::SettingsCat(SettingsCategory::Controls),
-                        false,
-                        Icon::Gamepad,
-                    ),
-                ] {
-                    let cw_chip = (ui.measure(Face::SemiBold, 10.5, lbl) + 34.0)
-                        .clamp(92.0, (content_w - 32.0) * 0.46);
-                    if chip_x + cw_chip > content_x + content_w - 12.0 {
-                        break;
-                    }
-                    let cr = [chip_x, chip_y, cw_chip, 24.0];
-                    self.targets.push((cr, act));
-                    ui.m3_filter_chip(cr, lbl, hi, Some(ic));
-                    chip_x += cw_chip + 8.0;
-                }
-
-                // 2. Jetpack Compose Material You 2-Column Bento Grid:
-                //    Left Bento Card: What's New in 26.3 + integrated Discord & GitHub tonal pills
-                //    Right Bento Card: Mod Loader & Compiler Engine live status + quick actions
-                let bento_gap = 10.0;
-                let has_two_cols = content_w >= 460.0;
-                let left_w = if has_two_cols {
-                    ((content_w - bento_gap) * 0.58).floor()
-                } else {
-                    content_w
-                };
-                let right_w = if has_two_cols {
-                    content_w - left_w - bento_gap
-                } else {
-                    0.0
-                };
-
-                ui.m3_tonal_card(content_x, bento_y, left_w, bento_h, 16.0, false);
-                let ver_header = if let Some(ref info) = self.catalog.update_info {
-                    format!(
-                        "CHANGELOG — MINECRAFT 26.3 • HORIZON ANDROID v{} (DOWNLOADED)",
-                        info.version
-                    )
-                } else if installed {
-                    format!(
-                        "CHANGELOG — MINECRAFT 26.3 • HORIZON ANDROID v{} (DOWNLOADED)",
-                        crate::updater::CURRENT_VERSION
-                    )
-                } else {
-                    "RELEASE HIGHLIGHTS — MINECRAFT 26.3 • HORIZON ANDROID".to_owned()
-                };
-                let fit_vh = ui.fit_text(Face::SemiBold, 10.8, &ver_header, left_w - 28.0);
-                ui.text(
-                    Face::SemiBold,
-                    10.8,
-                    content_x + 14.0,
-                    bento_y + 10.0,
-                    my3_accent(),
-                    &fit_vh,
-                );
-
-                let changelog_lines: Vec<String> = if let Some(ref info) = self.catalog.update_info
-                    && !info.changelog.trim().is_empty()
-                {
-                    info.changelog
-                        .lines()
-                        .map(str::trim)
-                        .filter(|l| !l.is_empty())
-                        .take(3)
-                        .map(|l| {
-                            if l.starts_with('•') || l.starts_with('-') || l.starts_with('*') {
-                                format!("• {}", l.trim_start_matches(['•', '-', '*', ' ']))
-                            } else {
-                                format!("• {l}")
-                            }
-                        })
-                        .collect()
-                } else if installed {
-                    vec![
-                        "• Uncapped Max FPS (260 FPS) with Vulkan non-blocking swapchain & 120Hz+ display".into(),
-                        "• Native horizon-port-pack compiler (.jar -> .hmod + .hnmod) & Modrinth auto-port".into(),
-                        "• Google Sans typography, Jetpack Compose Material You UI & GoyControl snap-grid".into(),
-                    ]
-                } else {
-                    vec![
-                        "• Downloads official Minecraft 26.3 assets directly from Mojang with 6-step verification".into(),
-                        "• Hardware Vulkan GPU batching, Vulkan compatibility & experimental OpenGL ES rendering".into(),
-                        "• Full MCPE & GoyControl touch studio with file manager import/export & Microsoft sign-in".into(),
-                    ]
-                };
-                let max_lines = ((bento_h - 64.0) / 18.0).floor().clamp(1.0, 3.0) as usize;
-                for (index, line) in changelog_lines.iter().take(max_lines).enumerate() {
-                    let fitted =
-                        ui.fit_text(Face::Regular, 11.8, line, (left_w - 28.0).max(80.0));
-                    ui.text(
+                if installed {
+                    ui.centered_fit(
                         Face::Regular,
-                        11.8,
-                        content_x + 14.0,
-                        bento_y + 29.0 + index as f32 * 18.0,
-                        my3_text(),
-                        &fitted,
-                    );
-                }
-
-                // Single integrated Community Tonal Pill Row inside Left Bento Card (no duplicate Discord!)
-                let comm_y = bento_y + bento_h - 36.0;
-                button(
-                    &mut ui,
-                    &mut self.targets,
-                    [content_x + 14.0, comm_y, 92.0, 26.0],
-                    "Discord",
-                    Action::Discord,
-                    false,
-                );
-                button(
-                    &mut ui,
-                    &mut self.targets,
-                    [content_x + 112.0, comm_y, 92.0, 26.0],
-                    "GitHub",
-                    Action::Repository,
-                    false,
-                );
-
-                // Right Bento Card: Mod Loader & Native Compiler Telemetry
-                if has_two_cols && right_w > 140.0 {
-                    let rx = content_x + left_w + bento_gap;
-                    ui.m3_tonal_card(rx, bento_y, right_w, bento_h, 16.0, false);
-                    ui.rounded(rx + 14.0, bento_y + 10.0, 28.0, 28.0, 8.0, my3_accent_soft());
-                    ui.icon(Icon::Terminal, rx + 20.0, bento_y + 16.0, 16.0, my3_accent());
-                    let rt_hdr = ui.fit_text(
-                        Face::SemiBold,
-                        12.5,
-                        "Horizon Mod Engine",
-                        right_w - 54.0,
-                    );
-                    ui.text(Face::SemiBold, 12.5, rx + 48.0, bento_y + 10.0, my3_text(), &rt_hdr);
-                    let rt_sub = ui.fit_text(
-                        Face::Regular,
-                        10.5,
-                        "Official Horizon Mods • In-Process Engine",
-                        right_w - 54.0,
-                    );
-                    ui.text(Face::Regular, 10.5, rx + 48.0, bento_y + 25.0, my3_accent(), &rt_sub);
-
-                    let active_mods = self
-                        .catalog
-                        .local
-                        .iter()
-                        .filter(|i| {
-                            i.kind == horizon_client::content_files::Kind::Mods && i.enabled
-                        })
-                        .count()
-                        + self.catalog.bundled_enabled.len();
-                    let active_shaders = self
-                        .catalog
-                        .local
-                        .iter()
-                        .filter(|i| {
-                            i.kind == horizon_client::content_files::Kind::Shaders && i.enabled
-                        })
-                        .count();
-                    let stat1 = ui.fit_text(
-                        Face::Medium,
-                        11.2,
-                        &format!("• Active Profile Mods: {active_mods} enabled (.hnmod / .hmod)"),
-                        right_w - 28.0,
-                    );
-                    let stat2 = ui.fit_text(
-                        Face::Medium,
-                        11.2,
-                        &format!(
-                            "• Shaders: {} active • 60 Built-in Mods Ready",
-                            active_shaders
-                        ),
-                        right_w - 28.0,
-                    );
-                    ui.text(Face::Medium, 11.2, rx + 14.0, bento_y + 45.0, my3_text(), &stat1);
-                    if bento_h >= 118.0 {
-                        ui.text(
-                            Face::Medium,
-                            11.2,
-                            rx + 14.0,
-                            bento_y + 63.0,
-                            my3_muted(),
-                            &stat2,
-                        );
-                    }
-
-                    let act_y = bento_y + bento_h - 36.0;
-                    let act_w = ((right_w - 34.0) * 0.5).max(58.0);
-                    button(
-                        &mut ui,
-                        &mut self.targets,
-                        [rx + 14.0, act_y, act_w, 26.0],
-                        "Installed Mods",
-                        Action::Page(Page::Installed),
-                        true,
-                    );
-                    button(
-                        &mut ui,
-                        &mut self.targets,
-                        [rx + 20.0 + act_w, act_y, act_w, 26.0],
-                        "Browse Mods",
-                        Action::Page(Page::Mods),
-                        false,
+                        11.5,
+                        [content_x + 16.0, play_y + 60.0, content_w - 32.0, 20.0],
+                        my3_muted(),
+                        "Installed and ready",
                     );
                 }
             }
